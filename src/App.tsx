@@ -56,13 +56,8 @@ export default function App() {
     setLoading(true);
     try {
       const info = await getInfo();
-      console.log('===传给后端的参数：', info);
-      info.fieldMetaList.forEach(item => {
-        console.log(`name: ${item.name}, primary: ${item.isPrimary}, description: ${item.description.content}`);
-      });
-      console.log('表名', info.tableMeta.name);
 
-      // 将 fieldMetaList 适配为 columns
+      // TODO: type暂时还没有进行额外映射，后续处理
       const columns = info.fieldMetaList.map(item => ({
         name: item.name,
         type: "TEXT",
@@ -71,7 +66,7 @@ export default function App() {
 
       const requestData: RequestPayload = {
         request_id: "",
-        query: "列出所有中国的机构",
+        query: input.current,
         external_knowledge: [],
         model: "lab-sql-optimized-20240426",
         stream: false,
@@ -89,13 +84,9 @@ export default function App() {
         }
       };
 
-      console.log('数据', JSON.stringify({ requestData }));
       const data = await callApi(requestData);
-      console.log('输出', data)
-      // const res = await getResult(requestData);
-      // if (res) {
-      //   setResult(JSON.stringify(res, null, '  '));
-      // }
+      // 前端输出返回结果
+      setResult(String(data.sql));
     } catch (e) {
       setResult(String(e));
     } finally {
@@ -122,6 +113,7 @@ export default function App() {
         <Input.TextArea readOnly style={{ height: '100%', width: '100%', overflow: 'auto', whiteSpace: 'pre', padding: '8px' }} value={result} />
       </div>
     </div>
+    
   </Spin >
 }
 
@@ -144,32 +136,22 @@ async function getMeta(params: { t: TFunction<"translation", undefined> }) {
   };
 }
 
-// async function getResult(params: { requestpayload: RequestPayload }) {
-//   const { requestpayload } = params;
-//   const res = await fetch('https://', {
-//     method: 'POST',
-//     body: JSON.stringify({ requestpayload })
-//   });
-//   return res.json();
-// }
-
 const callApi = async (payload: RequestPayload) => {
   try {
     console.log("输入数据,", JSON.stringify(payload))
-    const response = await fetch('https://test-bytebrain.byted.org/openapi/dbw/text2sql', {
+    const response = await fetch('https://api-bytebrain.byted.org/openapi/lark/text2sql', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      // mode: 'no-cors', // 添加这一行
     });
-    return await response.json();
+    const text = await response.json()
+    console.log("输出数据,", text)
+    return text;
   } catch (error) {
     console.error('Error:', error);
     throw error;
   }
-
-
-
-
 };
