@@ -1,9 +1,38 @@
-import { bitable, IFieldMeta, ITableMeta } from "@lark-base-open/js-sdk"
+import { bitable, IFieldMeta, ITableMeta } from "@lark-base-open/js-sdk";
 import { Button, Form, Input, message, Spin } from "antd";
 import { TFunction } from "i18next";
 import './App.css';
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+// 定义输入接口信息
+interface Column {
+  name: string;
+  type: string;
+  is_primary: boolean;
+}
+
+interface Table {
+  name: string;
+  columns: Column[];
+}
+
+interface DbMetadata {
+  db_id: string;
+  tables: Table[];
+}
+
+interface RequestPayload {
+  request_id: string;
+  query: string;
+  external_knowledge: string[];
+  model: string;
+  stream: boolean;
+  use_explanation: boolean;
+  use_fallback: boolean;
+  use_validator: boolean;
+  db_metadata: DbMetadata;
+}
 
 export default function App() {
   const { t } = useTranslation();
@@ -16,10 +45,11 @@ export default function App() {
     fieldMetaList: IFieldMeta[];
   }>();
 
+  // 获取线上db信息
   const getInfo = async () => {
     const info = await getMeta({ t });
-    baseInfo.current = (info);
-    return info
+    baseInfo.current = info;
+    return info;
   };
 
   const query = async () => {
@@ -27,16 +57,51 @@ export default function App() {
     try {
       const info = await getInfo();
       console.log('===传给后端的参数：', info);
-      const res = await getResult(info);
-      if (res) {
-        setResult(JSON.stringify(res, null, '  '));
-      }
+      info.fieldMetaList.forEach(item => {
+        console.log(`name: ${item.name}, primary: ${item.isPrimary}, description: ${item.description.content}`);
+      });
+      console.log('表名', info.tableMeta.name);
+
+      // 将 fieldMetaList 适配为 columns
+      const columns = info.fieldMetaList.map(item => ({
+        name: item.name,
+        type: "TEXT",
+        is_primary: item.isPrimary
+      }));
+
+      const requestData: RequestPayload = {
+        request_id: "",
+        query: "列出所有中国的机构",
+        external_knowledge: [],
+        model: "lab-sql-optimized-20240426",
+        stream: false,
+        use_explanation: true,
+        use_fallback: false,
+        use_validator: false,
+        db_metadata: {
+          db_id: "",
+          tables: [
+            {
+              name: info.tableMeta.name,
+              columns: columns
+            }
+          ]
+        }
+      };
+
+      console.log('数据', JSON.stringify({ requestData }));
+      const data = await callApi(requestData);
+      console.log('输出', data)
+      // const res = await getResult(requestData);
+      // if (res) {
+      //   setResult(JSON.stringify(res, null, '  '));
+      // }
     } catch (e) {
       setResult(String(e));
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return <Spin spinning={loading}>
     <div className="container">
@@ -71,30 +136,40 @@ async function getMeta(params: { t: TFunction<"translation", undefined> }) {
   const fieldMetaList = await table.getFieldMetaList();
   const tableMeta = await table.getMeta();
   const tableMetaList = await bitable.base.getTableMetaList();
+  
   return {
-    tableMeta,//所选数据的信息
-    tableMetaList,//所有数据表的信息
-    fieldMetaList,// 所选数据表的字段信息
-  }
-}
-
-async function getResult(params: {
-  tableMeta: ITableMeta;
-  tableMetaList: ITableMeta[];
-  fieldMetaList: IFieldMeta[];
-}) {
-  const {
     tableMeta,
     tableMetaList,
     fieldMetaList,
-  } = params;
-  const res = await fetch('https://', {
-    method: 'POST',
-    body: JSON.stringify({
-      tableMeta,
-      tableMetaList,
-      fieldMetaList,
-    })
-  });
-  return res;
+  };
 }
+
+// async function getResult(params: { requestpayload: RequestPayload }) {
+//   const { requestpayload } = params;
+//   const res = await fetch('https://', {
+//     method: 'POST',
+//     body: JSON.stringify({ requestpayload })
+//   });
+//   return res.json();
+// }
+
+const callApi = async (payload: RequestPayload) => {
+  try {
+    console.log("输入数据,", JSON.stringify(payload))
+    const response = await fetch('https://test-bytebrain.byted.org/openapi/dbw/text2sql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Error:', error);
+    throw error;
+  }
+
+
+
+
+};
