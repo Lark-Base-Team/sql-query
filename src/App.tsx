@@ -139,7 +139,7 @@ async function getMeta(params: { t: TFunction<"translation", undefined> }) {
 const callApi = async (payload: RequestPayload) => {
   try {
     console.log("输入数据,", JSON.stringify(payload))
-    const response = await fetch('https://api-bytebrain.byted.org/openapi/lark/text2sql', {
+    const response = await fetch('https://bytebrain.bytedance.net/openapi/lark/text2sql', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
